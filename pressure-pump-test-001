@@ -1,0 +1,53 @@
+services:
+  nats-server:
+    image: nats:latest
+    container_name: nats-server-container
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: "-js"
+
+  nats-publisher:
+    image: localhost:5001/tes-nats-publisher:0.0.1
+    container_name: nats-publisher-container
+    profiles:
+      - worker
+    environment:
+      - NATS_URL=nats://nats-server:4222
+    depends_on:
+      - nats-server
+
+  pressure-pump-tests:
+    image: localhost:5001/pressure-pump-tests:latest
+    container_name: pressure-pump-tests-container
+    profiles:
+      - worker
+    environment:
+      - NATS_URL=nats://nats-server:4222
+    depends_on:
+      - nats-server
+
+  iframe-dashboard-pressure-pump:
+    image: localhost:5001/iframe-dashboard-pressure-pump:latest
+    container_name: iframe-dashboard-pressure-pump-container
+    ports:
+      - "17913:17913"
+    environment:
+      - NATS_URL=nats://nats-server:4222
+    depends_on:
+      - nats-server
+
+  orchestrator:
+    image: localhost:5001/tes-orchestrator:0.0.4
+    container_name: orchestrator-container
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/workdir
+    working_dir: /workdir
+    command: 
+      # - "--fail-fast"
+      - nats-publisher
+      - pressure-pump-tests
+    depends_on:
+      - nats-server
+      - iframe-dashboard-pressure-pump
